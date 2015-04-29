@@ -1,7 +1,4 @@
 /* -*- c++ -*- */
-//%feature("autodoc", "1");		// generate python docstrings
-//%include "exception.i"
-%import "gnuradio.i"			// the common stuff
 
 %{
 #include "gnuradio_swig_bug_workaround.h"	// mandatory bug fix
@@ -11,8 +8,14 @@
 #include "gsm_burst_cf.h"
 #include "gsm_burst_sink_c.h"
 //#include <stdexcept>
-
+#include <cstddef>				// compiling with GCC 4.6 and over will cause issues without this include
 %}
+
+//%feature("autodoc", "1");		// generate python docstrings
+%include "exception.i"
+%import "gnuradio.i"			// the common stuff
+
+
 
 // ----------------------------------------------------------------
 
