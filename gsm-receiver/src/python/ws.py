@@ -1,60 +1,88 @@
 #!/usr/bin/env python
-
 import os
 import time
+import subprocess
 import sys
 from optparse import OptionParser
-import shutil
-import socket
-import subprocess
-HOST = '127.0.0.1'	# Symbolic name, meaning all available interfaces
-PORT = 4729	# GSMTAP sends UDP packages on this port
 
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-def sendMessage(fileName, section):
-	message = "%s for file: %s" % (section, fileName)
-	s.sendto(message, (HOST, PORT))
+def walklevel(some_dir, level=1):
+    some_dir = some_dir.rstrip(os.path.sep)
+    assert os.path.isdir(some_dir)
+    num_sep = some_dir.count(os.path.sep)
+    for root, dirs, files in os.walk(some_dir):
+        yield root, dirs, files
+        num_sep_this = root.count(os.path.sep)
+        if num_sep + level <= num_sep_this:
+            del dirs[:]
 
-def tshark(fileName):
+def checkIfDirExistsCreateIfNot(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    return directory
+
+
+def tshark(root, fileName):
+    dest = checkIfDirExistsCreateIfNot(root+"/pcapxml/")
     print("Starting tshark")
-    script = "tshark -i lo -f 'udp port 4729' -Y 'gsmtap' -a duration:10 -T pdml > %s.xml" % fileName
-    print(script)
-    #os.system(script)
-    subprocess.Popen(script, shell=True)
-    #fileNameXML = '%s.xml' % fileName
-    #os.spawnl(os.P_NOWAIT, '/usr/bin/tshark', '-i', 'lo', '-f', 'udp port 4729', '-Y', 'gsmtap', '-a', 'duration:10', '-T', 'pdml', '>', fileNameXML)
-    #os.spawnl(os.P_NOWAIT, '/usr/bin/tshark', (script))
+    script = "tshark -i lo -f 'udp port 4729' -Y 'gsmtap' -a duration:4 -T pdml > %s%s.xml" % (dest,fileName)
+    p = subprocess.Popen(script, shell=True)
+    #sleep, otherwise airprobe might be finished before we have initialized properly
+    time.sleep(1)
+    return p
 
-directory = "/home/openbts/Desktop/SCANTEST"
-dest = "/home/openbts/Desktop/PCAPZ/"
-def walkAllScannedFiles():
-    print("Walking all directories")
-    for root, _, files in os.walk(directory):
-        for f in files:
-            
-            fullpath = os.path.join(root, f)
-            quiet = "> /dev/null 2> /dev/null"
-            #sendMessage(f, "/BEGINNING")   
-            #sendMessage(f, "000000000000000000000000000000000")
-            shellscript = "./gsm_receive.py -I %s -d 64 -c 0C %s" % (fullpath, quiet)
-#            tshark(fullpath)
-            
-            script = "tshark -i lo -f 'udp port 4729' -Y 'gsmtap' -a duration:10 -T pdml > %s%s.xml" % (dest,f)
-            print(script)
-            p = subprocess.Popen(script, shell=True)
-            time.sleep(1)
-            print("Scanning: %s" % fullpath)
-            os.system(shellscript)
-            #subprocess.Popen(shellscript, shell=True)
-            #time.sleep(15)
-            #sendMessage(f, "/END")
-            #sendMessage(f, "111111111111111111111111111111111")
-            while p.poll() is None:
-                time.sleep(0.5)
-            print("NEXT FILE")
-    print("Walking done")
+def runScript(script):
+    os.system(script)
 
-walkAllScannedFiles()
+def gsmReceive(root, fileName):
+    print("Sending with airprobe file: %s/%s" % (root, fileName))
+    fullpath = os.path.join(root, fileName)
+    quiet = "> /dev/null 2> /dev/null"
+    shellscript = "./gsm_receive.py -I %s -d 64 -c 0C %s" % (fullpath, quiet)
+    runScript(shellscript)
+
+def handleFiles(root, files):
+    for f in files:
+        if ".json" in f:
+            continue
+        p = tshark(root, f)
+        gsmReceive(root, f)
+        while p.poll() is None:
+            time.sleep(0.5)
 
 
+directory = "/home/openbts/scans"
+# add a thing for accepting arguments
 
+def doit(directory, levels):
+
+    for root, dirs, files in walklevel(directory, levels):
+        print root
+        print files
+
+        handleFiles(root, files)
+    print("Done")
+
+def main():
+    parser = OptionParser(usage="usage: %prog [options]",
+                          version="%prog 1.0")
+    parser.add_option("-d", "--dir",
+                    action="store",
+                      dest="directory",
+                      help="Directory of files you want to process")
+    parser.add_option("-l", "--level",
+                      action="store",
+                      dest="levels",
+                      default=1,
+                      help="Number of levels deep you want traverse in the directory",)
+    (options, args) = parser.parse_args()
+
+    if len(args) != 0:
+        print (len(args))
+        print options
+        print args
+        parser.error("wrong number of arguments")
+    doit(options.directory, options.levels)
+
+
+if __name__ == '__main__':
+    main()
