@@ -9,26 +9,73 @@ from optparse import OptionParser
 # read all xml files
 #   parse them for interesting items
 #   export interesting things to database?
-
+CHANNELS = {}
+CELLS = {}
 
 def fileHasContents(fileName):
     size = os.stat(fileName).st_size
     return (size > 306)
 
 
+def getCells(parent):
+    cellElements = parent.xpath('//field/field[@name="gsm_a.bssmap.cell_ci"]')
+    print("Cell: %s" % (len(cellElements)))
+    cells = []
+    for c in cellElements:
+        cellId = c.get("show")
+        cellDecim = (int(cellId, 16))
+        if cellDecim not in cells:
+            cells.append(cellDecim)
+    return cells
+
+
+def hexToDecim(hexValue):
+    return (int(hexValue, 16))
+
+
+def getChannel(fileName):
+    return fileName.split("chan")[1].split(".")[0]
+
+
+def getLAI(parent):
+    MCC = parent.xpath('//field/field/field[@name="e212.mcc"]/@show')
+    MNC = parent.xpath('//field/field/field[@name="e212.mnc"]/@show')
+    LAC = parent.xpath('//field/field/field[@name="gsm_a.lac"]/@show')
+
+    MCC = list(set(MCC))
+    MNC = list(set(MNC))
+    LAC_HEX = list(set(LAC))
+    LAC = map(lambda nr : hexToDecim(nr), LAC_HEX)
+    #print("MCC %s, MNC %s, LAC %s" % (MCC, MNC, LAC))
+    LAI = {}
+    LAI["mcc"] = MCC
+    LAI["mcn"] = MNC
+    LAI["lac"] = LAC
+    print(LAI)
+
 def parseFiles(root, files):
     for fileName in files:
         fullpath = root + "/" + fileName
         
+        CHANNELS["channel"] = getChannel(fileName)
+
         if not fileHasContents(fullpath):
             continue
 
         tree = etree.parse(fullpath)
-        protos = tree.xpath('//proto[@name="gsm_a.ccch"]')
+        #protoElements = tree.xpath('//proto[@name="gsm_a.ccch"]')
 
-        print ("FileName: %s, %s" % (fileName, len(protos)))
+        #System Information Type 3
+        protoElements = tree.xpath('//proto[@name="gsm_a.ccch"]/field[@value="1b"]')
 
-
+        print("FileName: %s, %s" % (fileName, len(protoElements)))
+        for el in protoElements:
+            #Get the parent
+            parent = el.getparent()
+            
+            cells = getCells(parent)
+            print(cells)
+            getLAI(parent)
 
 def getTreeFromXml(file):
     return etree.parse(file)
