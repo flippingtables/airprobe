@@ -3,7 +3,8 @@
 import os
 from lxml import etree
 from optparse import OptionParser
-
+import json
+from pprint import pprint
 # get GPS data
 
 # read all xml files
@@ -12,6 +13,24 @@ from optparse import OptionParser
 CHANNELS = {}
 CELLS = {}
 
+SCANS = {}
+
+
+def getGPScoords(root, fileName):
+    fp = "%s/%s" % (root, fileName)
+    data = []
+    with open(fp) as data_file:
+        for line in data_file:
+            if "lat" in line and "lon" in line:
+                data.append(json.loads(line))
+                break
+    latlon = {}
+    latlon["time"]  = (data[0]["time"])
+    latlon["lat"] = (data[0]["lat"])
+    latlon["lon"] = (data[0]["lon"])
+    return latlon
+
+
 def fileHasContents(fileName):
     size = os.stat(fileName).st_size
     return (size > 306)
@@ -19,7 +38,6 @@ def fileHasContents(fileName):
 
 def getCells(parent):
     cellElements = parent.xpath('//field/field[@name="gsm_a.bssmap.cell_ci"]')
-    print("Cell: %s" % (len(cellElements)))
     cells = []
     for c in cellElements:
         cellId = c.get("show")
@@ -45,20 +63,29 @@ def getLAI(parent):
     MCC = list(set(MCC))
     MNC = list(set(MNC))
     LAC_HEX = list(set(LAC))
-    LAC = map(lambda nr : hexToDecim(nr), LAC_HEX)
-    #print("MCC %s, MNC %s, LAC %s" % (MCC, MNC, LAC))
+    LAC = map(lambda nr: hexToDecim(nr), LAC_HEX)
+    
     LAI = {}
     LAI["mcc"] = MCC
     LAI["mcn"] = MNC
     LAI["lac"] = LAC
-    print(LAI)
+
+    return LAI
 
 def parseFiles(root, files):
     for fileName in files:
+        SCAN = {}
+        gps = {}
+        if ".json" in fileName:
+            gps = getGPScoords(root, fileName)
+
+        if ".xml" not in fileName:
+            continue
         fullpath = root + "/" + fileName
         
-        CHANNELS["channel"] = getChannel(fileName)
+        channel = getChannel(fileName)
 
+        SCAN["CHANNEL"] = channel
         if not fileHasContents(fullpath):
             continue
 
@@ -69,13 +96,30 @@ def parseFiles(root, files):
         protoElements = tree.xpath('//proto[@name="gsm_a.ccch"]/field[@value="1b"]')
 
         print("FileName: %s, %s" % (fileName, len(protoElements)))
+        LAI = []
+        CELLS = []
         for el in protoElements:
             #Get the parent
             parent = el.getparent()
             
-            cells = getCells(parent)
-            print(cells)
-            getLAI(parent)
+            CELLS.append(getCells(parent))
+
+            LAI.append(getLAI(parent))
+        insertToDict(SCAN, "LAI", LAI)
+        insertToDict(SCAN, "CELLS", CELLS)
+
+        pprint(SCAN)
+
+
+def insertToDict(dict, KEY, items):
+    if KEY not in dict.keys():
+        dict[KEY] = items
+    else:
+        d = dict[KEY]
+        pprint(d)
+        d.append(items)
+    return dict
+
 
 def getTreeFromXml(file):
     return etree.parse(file)
@@ -94,8 +138,7 @@ def walklevel(some_dir, level=1):
 
 def doit(directory, levels):
     for root, dirs, files in walklevel(directory, levels):
-        print(root)
-        print(files)
+        print("Root: %s" % root)
         parseFiles(root, files)
 
     print("Done")
