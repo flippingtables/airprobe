@@ -5,15 +5,17 @@ from lxml import etree
 from optparse import OptionParser
 import json
 from pprint import pprint
+
+
 # get GPS data
 
 # read all xml files
 #   parse them for interesting items
 #   export interesting things to database?
+SCANS = {}
 CHANNELS = {}
 CELLS = {}
-
-SCANS = {}
+EVERYTHING = {}
 
 
 def getGPScoords(root, fileName):
@@ -21,7 +23,7 @@ def getGPScoords(root, fileName):
     data = []
     with open(fp) as data_file:
         for line in data_file:
-            if "lat" in line and "lon" in line:
+            if "lat" in line and "lon" in line and "time" in line:
                 data.append(json.loads(line))
                 break
     latlon = {}
@@ -33,8 +35,8 @@ def getGPScoords(root, fileName):
 
 def getTimeFromScan(directory):
     fileDir = directory.rsplit("/")[-2]
-    print(fileDir)
     return fileDir
+
 
 def fileHasContents(fileName):
     size = os.stat(fileName).st_size
@@ -83,11 +85,13 @@ def parseFiles(root, files):
     timeFromScan = ""
     if ("pcapxml" in root):
         timeFromScan = getTimeFromScan(root)
+        insertToDict(EVERYTHING, timeFromScan, timeFromScan)
     for fileName in files:
         SCAN = {}
         gps = {}
         if ".json" in fileName:
             gps = getGPScoords(root, fileName)
+            insertToDict(SCAN, "GPS", gps)
 
         if ".xml" not in fileName:
             continue
@@ -113,8 +117,8 @@ def parseFiles(root, files):
             LAI.append(getLAI(parent))
         insertToDict(SCAN, "LAI", LAI)
         insertToDict(SCAN, "CELLS", CELLS)
-        insertToDict(SCANS, channel, SCAN)
-    pprint(SCANS)
+        SCANS[channel] = SCAN
+    EVERYTHING[timeFromScan] = SCANS
 
 
 def insertToDict(dict, KEY, items):
@@ -142,10 +146,16 @@ def walklevel(some_dir, level=1):
             del dirs[:]
 
 
+def dump(theThing):
+    with open('DUMP.txt', 'a') as the_file:
+        #the_file.write(theThing)
+        pprint(theThing, stream=the_file)
+
 def doit(directory, levels):
     for root, dirs, files in walklevel(directory, levels):
         parseFiles(root, files)
 
+    dump(EVERYTHING)
     print("Done")
 
 
@@ -159,7 +169,7 @@ def main():
     parser.add_option("-l", "--level",
                       action="store",
                       dest="levels",
-                      default=1,
+                      default=3,
                       help="Number of levels deep you want traverse in the directory",)
     (options, args) = parser.parse_args()
 
