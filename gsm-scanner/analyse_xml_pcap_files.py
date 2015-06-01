@@ -86,22 +86,23 @@ def parseFiles(root, files):
     if ("pcapxml" in root):
         timeFromScan = getTimeFromScan(root)
         insertToDict(EVERYTHING, timeFromScan, timeFromScan)
+
     for fileName in files:
-        SCAN = {}
-        gps = {}
-        if ".json" in fileName:
-            gps = getGPScoords(root, fileName)
-            insertToDict(SCAN, "GPS", gps)
-
-        if ".xml" not in fileName:
-            continue
         fullpath = root + "/" + fileName
-        channel = getChannel(fileName)
+        SCAN = {}
 
-        SCAN["CHANNEL"] = channel
         if not fileHasContents(fullpath):
             continue
 
+        if ".json" in fileName:
+            d = EVERYTHING[timeFromScan]
+            d["GPS"] = getGPScoords(root, fileName)
+
+        if ".xml" not in fileName:
+            continue
+
+        channel = getChannel(fileName)
+        SCAN["CHANNEL"] = channel
         tree = etree.parse(fullpath)
 
         #System Information Type 3
@@ -118,6 +119,7 @@ def parseFiles(root, files):
         insertToDict(SCAN, "LAI", LAI)
         insertToDict(SCAN, "CELLS", CELLS)
         SCANS[channel] = SCAN
+
     EVERYTHING[timeFromScan] = SCANS
 
 
@@ -126,7 +128,6 @@ def insertToDict(dict, KEY, items):
         dict[KEY] = items
     else:
         d = dict[KEY]
-        pprint(d)
         d.append(items)
     return dict
 
@@ -147,9 +148,10 @@ def walklevel(some_dir, level=1):
 
 
 def dump(theThing):
-    with open('DUMP.txt', 'a') as the_file:
+    with open('DUMP.txt', 'w') as the_file:
         #the_file.write(theThing)
         pprint(theThing, stream=the_file)
+
 
 def doit(directory, levels):
     for root, dirs, files in walklevel(directory, levels):
