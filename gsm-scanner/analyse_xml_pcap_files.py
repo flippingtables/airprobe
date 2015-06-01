@@ -31,6 +31,11 @@ def getGPScoords(root, fileName):
     return latlon
 
 
+def getTimeFromScan(directory):
+    fileDir = directory.rsplit("/")[-2]
+    print(fileDir)
+    return fileDir
+
 def fileHasContents(fileName):
     size = os.stat(fileName).st_size
     return (size > 306)
@@ -51,10 +56,12 @@ def hexToDecim(hexValue):
     return (int(hexValue, 16))
 
 
+#filename is: chanNN.cfile.xml
 def getChannel(fileName):
     return fileName.split("chan")[1].split(".")[0]
 
 
+# returns the Location Area Identifier: Mobile Country Code, Mobile Network Code, Location Area Code
 def getLAI(parent):
     MCC = parent.xpath('//field/field/field[@name="e212.mcc"]/@show')
     MNC = parent.xpath('//field/field/field[@name="e212.mnc"]/@show')
@@ -73,6 +80,9 @@ def getLAI(parent):
     return LAI
 
 def parseFiles(root, files):
+    timeFromScan = ""
+    if ("pcapxml" in root):
+        timeFromScan = getTimeFromScan(root)
     for fileName in files:
         SCAN = {}
         gps = {}
@@ -82,7 +92,6 @@ def parseFiles(root, files):
         if ".xml" not in fileName:
             continue
         fullpath = root + "/" + fileName
-        
         channel = getChannel(fileName)
 
         SCAN["CHANNEL"] = channel
@@ -90,25 +99,22 @@ def parseFiles(root, files):
             continue
 
         tree = etree.parse(fullpath)
-        #protoElements = tree.xpath('//proto[@name="gsm_a.ccch"]')
 
         #System Information Type 3
         protoElements = tree.xpath('//proto[@name="gsm_a.ccch"]/field[@value="1b"]')
 
-        print("FileName: %s, %s" % (fileName, len(protoElements)))
+        #print("FileName: %s, %s" % (fileName, len(protoElements)))
         LAI = []
         CELLS = []
         for el in protoElements:
             #Get the parent
             parent = el.getparent()
-            
             CELLS.append(getCells(parent))
-
             LAI.append(getLAI(parent))
         insertToDict(SCAN, "LAI", LAI)
         insertToDict(SCAN, "CELLS", CELLS)
-
-        pprint(SCAN)
+        insertToDict(SCANS, channel, SCAN)
+    pprint(SCANS)
 
 
 def insertToDict(dict, KEY, items):
@@ -138,7 +144,6 @@ def walklevel(some_dir, level=1):
 
 def doit(directory, levels):
     for root, dirs, files in walklevel(directory, levels):
-        print("Root: %s" % root)
         parseFiles(root, files)
 
     print("Done")
