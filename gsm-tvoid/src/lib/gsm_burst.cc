@@ -6,6 +6,7 @@
 #include "gsm_burst.h"
 #include <gr_math.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <math.h>
 #include <memory.h>
 #include <assert.h>
