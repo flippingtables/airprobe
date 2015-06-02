@@ -5,6 +5,22 @@ from lxml import etree
 from optparse import OptionParser
 import json
 from pprint import pprint
+import sqlite3
+
+sqlite_file = 'scan_database.sqlite'    # name of the sqlite database file
+
+
+def setupDb():
+    # Connecting to the database file
+    conn = sqlite3.connect(sqlite_file)
+    c = conn.cursor()
+
+    # Creating a new SQLite table with 1 column
+    c.execute('CREATE TABLE scans(id INTEGER PRIMARY KEY, SCAN TEXT, channel TEXT, cells email TEXT unique, password TEXT')
+
+    # Committing changes and closing the connection to the database file
+    conn.commit()
+    conn.close()
 
 
 # get GPS data
@@ -12,9 +28,8 @@ from pprint import pprint
 # read all xml files
 #   parse them for interesting items
 #   export interesting things to database?
-SCANS = {}
 CHANNELS = {}
-CELLS = {}
+# CELLS = {}
 EVERYTHING = {}
 
 
@@ -33,8 +48,8 @@ def getGPScoords(root, fileName):
     return latlon
 
 
-def getTimeFromScan(directory):
-    fileDir = directory.rsplit("/")[-2]
+def getTimeFromScan(directory, numBack):
+    fileDir = directory.rsplit("/")[numBack]
     return fileDir
 
 
@@ -78,15 +93,18 @@ def getLAI(parent):
     LAI["mcc"] = MCC
     LAI["mcn"] = MNC
     LAI["lac"] = LAC
-
     return LAI
 
-def parseFiles(root, files):
-    timeFromScan = ""
-    if ("pcapxml" in root):
-        timeFromScan = getTimeFromScan(root)
-        insertToDict(EVERYTHING, timeFromScan, timeFromScan)
 
+def parseFiles(root, files):
+    global EVERYTHING
+    timeFromScan = "pns"
+    if ("pcapxml" in root):
+        timeFromScan = getTimeFromScan(root, -2)
+        if timeFromScan not in EVERYTHING.keys():
+            EVERYTHING[timeFromScan] = {}
+
+    SCANS = {}
     for fileName in files:
         fullpath = root + "/" + fileName
         SCAN = {}
@@ -94,21 +112,15 @@ def parseFiles(root, files):
         if not fileHasContents(fullpath):
             continue
 
-        if ".json" in fileName:
-            d = EVERYTHING[timeFromScan]
-            d["GPS"] = getGPScoords(root, fileName)
-
         if ".xml" not in fileName:
             continue
 
         channel = getChannel(fileName)
-        SCAN["CHANNEL"] = channel
         tree = etree.parse(fullpath)
 
         #System Information Type 3
         protoElements = tree.xpath('//proto[@name="gsm_a.ccch"]/field[@value="1b"]')
 
-        #print("FileName: %s, %s" % (fileName, len(protoElements)))
         LAI = []
         CELLS = []
         for el in protoElements:
@@ -118,9 +130,20 @@ def parseFiles(root, files):
             LAI.append(getLAI(parent))
         insertToDict(SCAN, "LAI", LAI)
         insertToDict(SCAN, "CELLS", CELLS)
+
+        if not (len(LAI) > 0 and len(CELLS) > 0):
+            continue
         SCANS[channel] = SCAN
 
-    EVERYTHING[timeFromScan] = SCANS
+    for f in files:
+        if ".json" in f:
+            timeFromScan = getTimeFromScan(root, -1)
+            d = EVERYTHING[timeFromScan]
+            d["GPS"] = getGPScoords(root, f)
+
+    if ("pcapxml" in root):
+        print("Adding to: %s, %s" % (timeFromScan, root))
+        EVERYTHING[timeFromScan].update(SCANS)
 
 
 def insertToDict(dict, KEY, items):
@@ -156,7 +179,9 @@ def dump(theThing):
 def doit(directory, levels):
     for root, dirs, files in walklevel(directory, levels):
         parseFiles(root, files)
-
+        for d in dirs:
+            if "pcapxml" not in d and "DST" not in d:
+                EVERYTHING[d] = {}
     dump(EVERYTHING)
     print("Done")
 
@@ -167,6 +192,7 @@ def main():
     parser.add_option("-d", "--dir",
                             action="store",
                             dest="directory",
+                            default="/home/openbts/scans",
                             help="Directory of files you want to process")
     parser.add_option("-l", "--level",
                       action="store",
