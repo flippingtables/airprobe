@@ -4,24 +4,34 @@ import os
 from lxml import etree
 from optparse import OptionParser
 import json
-from pprint import pprint
 import sqlite3
 
-sqlite_file = 'scan_database.sqlite'    # name of the sqlite database file
+sqlite_file = 'db.sqlite'    # name of the sqlite database file
+sqlite_insert_query = 'insert into scans values(NULL, ?, ?, ?, ?, ?, ?,?, ?, ?);'
 
 
-def setupDb():
-    # Connecting to the database file
-    conn = sqlite3.connect(sqlite_file)
-    c = conn.cursor()
+def setupDB():
+    db = sqlite3.connect(sqlite_file)
+    db.execute('''CREATE TABLE IF NOT EXISTS scans
+        (Id integer primary key autoincrement,
+        SCAN TEXT, 
+        channel integer,
+        cell integer,
+        lac integer,
+        mcc integer,
+        mnc integer,
+        lat real,
+        lon real,
+        timestamp_gps text);''')
+    db.close()
 
-    # Creating a new SQLite table with 1 column
-    c.execute('CREATE TABLE scans(id INTEGER PRIMARY KEY, SCAN TEXT, channel TEXT, cells email TEXT unique, password TEXT')
 
-    # Committing changes and closing the connection to the database file
-    conn.commit()
-    conn.close()
 
+def num(s):
+    try:
+        return int(s)
+    except ValueError:
+        return float(s)
 
 # get GPS data
 
@@ -48,6 +58,12 @@ def getGPScoords(root, fileName):
     return latlon
 
 
+def setGPS(root, f):
+    if ".json" in f:
+        timeFromScan = getTimeFromScan(root, -1)
+        d = EVERYTHING[timeFromScan]
+        d["GPS"] = getGPScoords(root, f)
+
 def getTimeFromScan(directory, numBack):
     fileDir = directory.rsplit("/")[numBack]
     return fileDir
@@ -61,11 +77,29 @@ def fileHasContents(fileName):
 def getCells(parent):
     cellElements = parent.xpath('//field/field[@name="gsm_a.bssmap.cell_ci"]')
     cells = []
-    for c in cellElements:
-        cellId = c.get("show")
-        cellDecim = (int(cellId, 16))
-        if cellDecim not in cells:
-            cells.append(cellDecim)
+    for el in cellElements:
+        baby = el.getparent().getnext().getchildren()[0].getchildren()
+        cell = hexToDecim(el.get("show"))
+        mcc = num(baby[0].get("show"))
+        mnc = num(baby[1].get("show"))
+        lac = hexToDecim(baby[2].get("show"))
+        tmp = {}
+        tmp["CELL"] = cell
+        tmp["MCC"] = mcc
+        tmp["MNC"] = mnc
+        tmp["LAC"] = lac
+        if tmp not in cells:
+            cells.append(tmp)
+        # print("Cell %s " % cell)                     #HEX
+        # print("MCC %s " % mcc)
+        # print("MNC %s " % mnc)
+        # print("LAC %s " % lac)                  #LAC is in HEX, so we need to convert
+
+    # cells = []
+    # for c in cellElements:
+    #     cellDecim = (int(c.get("show"), 16))
+    #     if cellDecim not in cells:
+    #         cells.append(cellDecim)
     return cells
 
 
@@ -85,13 +119,15 @@ def getLAI(parent):
     LAC = parent.xpath('//field/field/field[@name="gsm_a.lac"]/@show')
 
     MCC = list(set(MCC))
+    MCC = map(lambda nr: num(nr), MCC)
     MNC = list(set(MNC))
+    MNC = map(lambda nr: num(nr), MNC)
     LAC_HEX = list(set(LAC))
     LAC = map(lambda nr: hexToDecim(nr), LAC_HEX)
     
     LAI = {}
     LAI["mcc"] = MCC
-    LAI["mcn"] = MNC
+    LAI["mnc"] = MNC
     LAI["lac"] = LAC
     return LAI
 
@@ -108,6 +144,8 @@ def parseFiles(root, files):
     for fileName in files:
         fullpath = root + "/" + fileName
         SCAN = {}
+
+        setGPS(root, fileName)
 
         if not fileHasContents(fullpath):
             continue
@@ -126,20 +164,26 @@ def parseFiles(root, files):
         for el in protoElements:
             #Get the parent
             parent = el.getparent()
-            CELLS.append(getCells(parent))
-            LAI.append(getLAI(parent))
-        insertToDict(SCAN, "LAI", LAI)
+            CELLS.extend(getCells(parent))
+            # LAI.append(getLAI(parent))
+        # insertToDict(SCAN, "LAI", LAI)
         insertToDict(SCAN, "CELLS", CELLS)
 
-        if not (len(LAI) > 0 and len(CELLS) > 0):
-            continue
-        SCANS[channel] = SCAN
 
-    for f in files:
-        if ".json" in f:
-            timeFromScan = getTimeFromScan(root, -1)
-            d = EVERYTHING[timeFromScan]
-            d["GPS"] = getGPScoords(root, f)
+        if not (len(CELLS) > 0):
+            continue
+        
+        print(len(CELLS))
+        db = sqlite3.connect(sqlite_file)
+        for i in range(0, len(CELLS)):
+            db.execute(sqlite_insert_query, (timeFromScan, num(channel), CELLS[i]["CELL"], CELLS[i]["LAC"],
+             CELLS[i]["MCC"], CELLS[i]["MNC"], EVERYTHING[timeFromScan]["GPS"]["lat"],
+             EVERYTHING[timeFromScan]["GPS"]["lon"], EVERYTHING[timeFromScan]["GPS"]["time"]))
+
+        db.commit()
+        db.close()
+
+        SCANS[channel] = SCAN
 
     if ("pcapxml" in root):
         print("Adding to: %s, %s" % (timeFromScan, root))
@@ -172,16 +216,17 @@ def walklevel(some_dir, level=1):
 
 def dump(theThing):
     with open('DUMP.txt', 'w') as the_file:
-        #the_file.write(theThing)
-        pprint(theThing, stream=the_file)
+        json.dump(theThing, the_file, sort_keys=True, indent=4)
 
 
 def doit(directory, levels):
+    setupDB()
     for root, dirs, files in walklevel(directory, levels):
         parseFiles(root, files)
         for d in dirs:
             if "pcapxml" not in d and "DST" not in d:
                 EVERYTHING[d] = {}
+    
     dump(EVERYTHING)
     print("Done")
 
