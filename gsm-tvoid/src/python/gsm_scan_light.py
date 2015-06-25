@@ -22,7 +22,7 @@ for extdir in ['../lib','../lib/.libs']:
 		sys.path.append(extdir)
 
 from gnuradio import gr, gru, blks2
-from gnuradio import usrp
+#from gnuradio import usrp
 from gnuradio import eng_notation
 from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, waterfallsink2, scopesink2, form, slider
@@ -366,16 +366,16 @@ class tvoid_receiver(gr.top_block):
 		print >> sys.stderr, "fusb_nblocks    =", options.fusb_nblocks
 
 			
-		self.ursp = usrp.source_c(decim_rate=options.decim,fusb_block_size=options.fusb_block_size,fusb_nblocks=options.fusb_nblocks)
+		#self.ursp = usrp.source_c(decim_rate=options.decim,fusb_block_size=options.fusb_block_size,fusb_nblocks=options.fusb_nblocks)
 		self.ursp.set_fpga_master_clock_freq(options.clock_frequency)
 
 		if options.rx_subdev_spec is None:
 			options.rx_subdev_spec = pick_subdevice(self.ursp)
 		
-		self.ursp.set_mux(usrp.determine_rx_mux_value(self.ursp, options.rx_subdev_spec))
+		#self.ursp.set_mux(usrp.determine_rx_mux_value(self.ursp, options.rx_subdev_spec))
 
 		# determine the daughterboard subdevice
-		self.subdev = usrp.selected_subdev(self.ursp, options.rx_subdev_spec)
+		#self.subdev = usrp.selected_subdev(self.ursp, options.rx_subdev_spec)
 		input_rate = self.ursp.adc_freq() / self.ursp.decim_rate()
 
 		if options.antenna is not None:
@@ -532,7 +532,7 @@ class tvoid_receiver(gr.top_block):
 			self.source = gr.file_source(gr.sizeof_gr_complex, options.inputfile, options.fileloop)
 		else:
 			self.using_usrp = True
-			self.setup_usrp()
+			#self.setup_usrp()
 
 		self.setup_filter()
 

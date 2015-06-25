@@ -79,8 +79,8 @@ def calculateFrequency(arfcn):
 
 
 directory = getDir()
-destination = directory + "DST/"
-checkIfDirExistsCreateIfNot(destination)
+# destination = directory + "DST/"
+# checkIfDirExistsCreateIfNot(destination)
 
 
 def runscript(script):
