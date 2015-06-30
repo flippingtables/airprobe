@@ -95,7 +95,7 @@ class gsm_receiver_first_blood(gr.top_block):
                           help="Input filename")
         parser.add_option("-O", "--outputfile", type="string", default="cfile2.out",
                           help="Output filename")
-        parser.add_option("-k", "--key", type="string", default="AD 6A 3E C2 B4 42 E4 00",
+        parser.add_option("-k", "--key", type="string", default="00 00 00 00 00 00 00 00", #default="AD 6A 3E C2 B4 42 E4 00",
                           help="KC session key")
         parser.add_option("-c", "--configuration", type="string", default="",
                           help="Decoder configuration")

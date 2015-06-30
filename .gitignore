@@ -22,3 +22,25 @@ install-sh
 configure
 py-compile
 stamp-h1
+/.project
+
+# added by GitSavvy
+/gsmsp/aclocal.m4
+
+# added by GitSavvy
+/gsmsp/Makefile.in
+
+# added by GitSavvy
+/gsmsp/configure
+
+# added by GitSavvy
+/gsmsp/python/Makefile.in
+
+# added by GitSavvy
+/gsmsp/resources/Makefile.in
+
+# added by GitSavvy
+/gsmsp/resources/data/Makefile.in
+
+# added by GitSavvy
+/gsmsp/resources/tools/Makefile.in
