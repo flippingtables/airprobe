@@ -1,0 +1,25 @@
+
+
+# scanner.py
+
+A tool for capturing downlink broadcast traffic from BTS to MS.
+
+This tool will perform a scan of all downlink channels downlink channels in the GSM900 band and dump then in a capture directory.
+For each scan, and if an Android device with a GPS is plugged in, the tool will gather gps data, and dump it in the capture directory.
+The GPS data is in the form of a json file, which can be parsed and extracted as necessary.
+
+## Output
+Each scan will result in a directory "$OUTPUT_DIR/20150626-1550/"
+In each directory there is a list of "chanXX.cfile" files, and a "gps.json" file.
+Each "chanXX.cfile" corresponds to the radio capture of that specific channel.
+
+## PREREQUISITES:
+Airprobe projects are compiled and installed.
+UHD drivers are installed
+
+## GPS PREREQUISITES
+Android device
+USB cable for Android device
+Android Debug Bridge (adb) installed
+gpsd installed and in PATH
+gpspipe installed and in PATH
