@@ -1,0 +1,19 @@
+
+
+# convert_cfile_to_xmlpcap.py
+
+A tool for converting captured downlink broadcast traffic from BTS to MS to pcap xml files containing GSMTAP data.
+
+## Output
+Each scan will result in a directory "$OUTPUT_DIR/20150626-1550/pcapxml"
+In each "pcapxml" directory there is a list of "chanXX.cfile.xml" files.
+The "xml" files are cfiles which have been converted to "GSMTAP" UDP packages, 
+which have been received by 'tshark' and dumped as pcap xml files.
+
+Each "chanXX.cfile.xml" corresponds to the radio capture of that specific channel.
+
+## PREREQUISITES:
+Airprobe projects are compiled and installed.
+UHD drivers are installed
+Wireshark installed
+tshark installed
